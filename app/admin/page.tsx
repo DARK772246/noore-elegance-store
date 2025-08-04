@@ -35,10 +35,16 @@ import {
 } from "lucide-react"
 import { createClient } from '@supabase/supabase-js'
 
-// Supabase Client Setup
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-const supabase = createClient(supabaseUrl, supabaseKey)
+// Supabase Client Setup - WITH VALIDATION (FIX FOR VERCEL)
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+if (!supabaseUrl || !supabaseKey) {
+  throw new Error("Supabase URL and Anon Key must be defined in Environment Variables.");
+}
+
+const supabase = createClient(supabaseUrl, supabaseKey);
+
 
 // Interfaces
 interface Product {
@@ -83,6 +89,8 @@ export default function AdminPanel() {
   useEffect(() => {
     if (isAuthenticated) {
       fetchData()
+    } else {
+        setIsLoading(false); // Stop loading if not authenticated
     }
   }, [isAuthenticated])
 
@@ -125,7 +133,7 @@ export default function AdminPanel() {
       } else {
           alert("Product added successfully!");
           fetchData();
-          setIsDialogOpen(false);
+          setIsDialogOpen(false); // Close dialog on success
       }
   }
   
@@ -282,7 +290,6 @@ export default function AdminPanel() {
                                           <div><Label>Original Price (Optional)</Label><Input type="number" value={String(newProduct.originalPrice || '')} onChange={e => handleInputChange('originalPrice', e.target.value)} /></div>
                                           <div><Label>Stock</Label><Input type="number" value={String(newProduct.stock)} onChange={e => handleInputChange('stock', e.target.value)} /></div>
                                           <div><Label>Description</Label><Textarea value={newProduct.description} onChange={e => handleInputChange('description', e.target.value)} /></div>
-                                          {/* Image Upload can be added here */}
                                       </div>
                                       <Button onClick={handleAddProduct}>Publish Product</Button>
                                   </DialogContent>
@@ -290,7 +297,7 @@ export default function AdminPanel() {
                           </CardTitle>
                       </CardHeader>
                       <CardContent>
-                          {isLoading ? <Loader2 className="animate-spin" /> :
+                          {isLoading ? <div className="flex justify-center p-8"><Loader2 className="animate-spin" /></div> :
                           <Table>
                               <TableHeader><TableRow><TableHead>Image</TableHead><TableHead>Product</TableHead><TableHead>Price</TableHead><TableHead>Stock</TableHead><TableHead>Actions</TableHead></TableRow></TableHeader>
                               <TableBody>
@@ -316,7 +323,7 @@ export default function AdminPanel() {
                               <Input placeholder="New category name" value={newCategoryName} onChange={e => setNewCategoryName(e.target.value)} />
                               <Button onClick={handleAddCategory}>Add Category</Button>
                           </div>
-                           {isLoading ? <Loader2 className="animate-spin" /> :
+                           {isLoading ? <div className="flex justify-center p-8"><Loader2 className="animate-spin" /></div> :
                           <Table>
                               <TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Actions</TableHead></TableRow></TableHeader>
                               <TableBody>
