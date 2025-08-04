@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -18,6 +18,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  DialogClose,
 } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
@@ -30,137 +31,146 @@ import {
   Trash2,
   Eye,
   Lock,
+  Loader2,
 } from "lucide-react"
+import { createClient } from '@supabase/supabase-js'
 
-// Mock data
-const orders = [
-  {
-    id: "ORD-001",
-    customer: "Ayesha Khan",
-    email: "ayesha@email.com",
-    total: 15999,
-    codFee: 100,
-    finalTotal: 16099,
-    status: "pending",
-    paymentMethod: "COD",
-    date: "2024-01-15",
-    items: 2,
-  },
-  {
-    id: "ORD-002",
-    customer: "Fatima Ali",
-    email: "fatima@email.com",
-    total: 8999,
-    codFee: 0,
-    finalTotal: 8999,
-    status: "shipped",
-    paymentMethod: "NayaPay",
-    date: "2024-01-14",
-    items: 1,
-  },
-  {
-    id: "ORD-003",
-    customer: "Zara Ahmed",
-    email: "zara@email.com",
-    total: 25999,
-    codFee: 100,
-    finalTotal: 26099,
-    status: "delivered",
-    paymentMethod: "COD",
-    date: "2024-01-13",
-    items: 3,
-  },
-]
+// Supabase Client Setup
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+const supabase = createClient(supabaseUrl, supabaseKey)
 
-const products = [
-  {
-    id: 1,
-    name: "Elegant Evening Dress",
-    category: "Dresses",
-    price: 15999,
-    stock: 25,
-    status: "active",
-    image: "/placeholder.svg?height=100&width=100",
-  },
-  {
-    id: 2,
-    name: "Designer Handbag",
-    category: "Bags",
-    price: 8999,
-    stock: 12,
-    status: "active",
-    image: "/placeholder.svg?height=100&width=100",
-  },
-  {
-    id: 3,
-    name: "Premium Heels",
-    category: "Shoes",
-    price: 6999,
-    stock: 0,
-    status: "inactive",
-    image: "/placeholder.svg?height=100&width=100",
-  },
-]
+// Interfaces
+interface Product {
+    id?: number;
+    name: string;
+    category: string;
+    price: number | string;
+    originalPrice?: number | string | null;
+    stock: number | string;
+    description: string;
+    imageUrl: string;
+    status: 'active' | 'inactive';
+}
 
-const users = [
-  {
-    id: 1,
-    name: "Ayesha Khan",
-    email: "ayesha@email.com",
-    phone: "0321-1234567",
-    orders: 5,
-    totalSpent: 45999,
-    joinDate: "2024-01-01",
-  },
-  {
-    id: 2,
-    name: "Fatima Ali",
-    email: "fatima@email.com",
-    phone: "0333-9876543",
-    orders: 3,
-    totalSpent: 28999,
-    joinDate: "2024-01-05",
-  },
-]
+interface Category {
+    id: number;
+    name: string;
+}
 
 export default function AdminPanel() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [adminCredentials, setAdminCredentials] = useState({ username: "", password: "" })
 
+  const [products, setProducts] = useState<Product[]>([])
+  const [categories, setCategories] = useState<Category[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  
+  const [newProduct, setNewProduct] = useState<Product>({
+    name: "",
+    category: "",
+    price: "",
+    originalPrice: "",
+    stock: "",
+    description: "",
+    imageUrl: "/placeholder.svg?height=100&width=100",
+    status: 'active'
+  });
+  
+  const [newCategoryName, setNewCategoryName] = useState("");
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      fetchData()
+    }
+  }, [isAuthenticated])
+
+  const fetchData = async () => {
+    setIsLoading(true)
+    const { data: productsData } = await supabase.from('products').select('*').order('id', { ascending: false })
+    const { data: categoriesData } = await supabase.from('categories').select('*').order('name')
+    if (productsData) setProducts(productsData)
+    if (categoriesData) setCategories(categoriesData)
+    setIsLoading(false)
+  }
+
   const handleAdminLogin = (e: React.FormEvent) => {
     e.preventDefault()
-    // Simple authentication - in real app, use proper authentication
     if (adminCredentials.username === "admin" && adminCredentials.password === "noore2024") {
       setIsAuthenticated(true)
     } else {
       alert("Invalid credentials")
     }
   }
+  
+  const handleInputChange = (field: keyof Product, value: string) => {
+      setNewProduct(prev => ({ ...prev, [field]: value }));
+  };
 
-  const formatPrice = (price: number) => {
-    return `₨ ${price.toLocaleString()}`
+  const handleAddProduct = async () => {
+      if (!newProduct.name || !newProduct.category || !newProduct.price) {
+          alert("Please fill name, category and price.");
+          return;
+      }
+      const productToInsert = {
+          ...newProduct,
+          price: Number(newProduct.price),
+          originalPrice: newProduct.originalPrice ? Number(newProduct.originalPrice) : null,
+          stock: Number(newProduct.stock)
+      }
+      const { data, error } = await supabase.from('products').insert([productToInsert]).select();
+      if (error) {
+          alert("Error adding product: " + error.message);
+      } else {
+          alert("Product added successfully!");
+          fetchData();
+          setIsDialogOpen(false);
+      }
   }
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "pending":
-        return "bg-yellow-500"
-      case "shipped":
-        return "bg-blue-500"
-      case "delivered":
-        return "bg-green-500"
-      case "cancelled":
-        return "bg-red-500"
-      default:
-        return "bg-gray-500"
+  
+  const handleDeleteProduct = async (productId: number | undefined) => {
+    if(!productId) return;
+    if (confirm("Are you sure you want to delete this product?")) {
+        const { error } = await supabase.from('products').delete().match({ id: productId })
+        if (error) {
+            alert("Error deleting product: " + error.message)
+        } else {
+            alert("Product deleted successfully!")
+            fetchData()
+        }
     }
   }
-
-  const updateOrderStatus = (orderId: string, newStatus: string) => {
-    // Update order status logic
-    console.log(`Updating order ${orderId} to ${newStatus}`)
+  
+  const handleAddCategory = async () => {
+      if (!newCategoryName.trim()) {
+          alert("Please enter a category name.");
+          return;
+      }
+      const { data, error } = await supabase.from('categories').insert([{ name: newCategoryName }]).select();
+       if (error) {
+          alert("Error adding category: " + error.message);
+      } else {
+          alert("Category added successfully!");
+          setNewCategoryName("");
+          fetchData();
+      }
+  }
+  
+  const handleDeleteCategory = async (categoryId: number) => {
+      if (confirm("Are you sure you want to delete this category?")) {
+          const { error } = await supabase.from('categories').delete().match({ id: categoryId });
+          if (error) {
+            alert("Error deleting category: " + error.message)
+        } else {
+            alert("Category deleted successfully!")
+            fetchData()
+        }
+      }
   }
 
+  const formatPrice = (price: any) => `₨ ${Number(price).toLocaleString()}`;
+    
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-purple-900 via-pink-900 to-blue-900 flex items-center justify-center p-4">
@@ -220,7 +230,6 @@ export default function AdminPanel() {
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-pink-50 to-blue-50">
       <div className="p-6">
         <div className="max-w-7xl mx-auto">
-          {/* Header */}
           <div className="mb-8">
             <div className="bg-white bg-opacity-20 backdrop-blur-md rounded-3xl p-6 border border-white border-opacity-30 shadow-lg">
               <div className="flex justify-between items-center">
@@ -240,467 +249,88 @@ export default function AdminPanel() {
               </div>
             </div>
           </div>
-
-          {/* Stats Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            <Card className="bg-white bg-opacity-20 backdrop-blur-md border border-white border-opacity-30">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-gray-600">Total Orders</p>
-                    <p className="text-2xl font-bold text-purple-600">156</p>
-                  </div>
-                  <ShoppingCart className="w-8 h-8 text-purple-600" />
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-white bg-opacity-20 backdrop-blur-md border border-white border-opacity-30">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-gray-600">Total Products</p>
-                    <p className="text-2xl font-bold text-pink-600">89</p>
-                  </div>
-                  <Package className="w-8 h-8 text-pink-600" />
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-white bg-opacity-20 backdrop-blur-md border border-white border-opacity-30">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-gray-600">Total Users</p>
-                    <p className="text-2xl font-bold text-blue-600">234</p>
-                  </div>
-                  <Users className="w-8 h-8 text-blue-600" />
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-white bg-opacity-20 backdrop-blur-md border border-white border-opacity-30">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-gray-600">Revenue</p>
-                    <p className="text-2xl font-bold text-green-600">₨2.4M</p>
-                  </div>
-                  <TrendingUp className="w-8 h-8 text-green-600" />
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Main Content */}
-          <Tabs defaultValue="orders" className="space-y-6">
-            <TabsList className="bg-white bg-opacity-20 backdrop-blur-md border border-white border-opacity-30">
-              <TabsTrigger value="orders">Orders</TabsTrigger>
-              <TabsTrigger value="products">Products</TabsTrigger>
-              <TabsTrigger value="users">Users</TabsTrigger>
-              <TabsTrigger value="categories">Categories</TabsTrigger>
-            </TabsList>
-
-            {/* Orders Tab */}
-            <TabsContent value="orders">
-              <Card className="bg-white bg-opacity-20 backdrop-blur-md border border-white border-opacity-30">
-                <CardHeader>
-                  <CardTitle className="flex items-center justify-between">
-                    <span>Recent Orders</span>
-                    <Badge variant="secondary">{orders.length} orders</Badge>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Order ID</TableHead>
-                        <TableHead>Customer</TableHead>
-                        <TableHead>Total</TableHead>
-                        <TableHead>COD Fee</TableHead>
-                        <TableHead>Final Total</TableHead>
-                        <TableHead>Payment</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {orders.map((order) => (
-                        <TableRow key={order.id}>
-                          <TableCell className="font-medium">{order.id}</TableCell>
-                          <TableCell>
-                            <div>
-                              <p className="font-medium">{order.customer}</p>
-                              <p className="text-sm text-gray-600">{order.email}</p>
-                            </div>
-                          </TableCell>
-                          <TableCell>{formatPrice(order.total)}</TableCell>
-                          <TableCell>{order.codFee > 0 ? formatPrice(order.codFee) : "-"}</TableCell>
-                          <TableCell className="font-semibold">{formatPrice(order.finalTotal)}</TableCell>
-                          <TableCell>
-                            <Badge variant={order.paymentMethod === "COD" ? "destructive" : "default"}>
-                              {order.paymentMethod}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            <Badge className={`${getStatusColor(order.status)} text-white`}>{order.status}</Badge>
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex gap-2">
-                              <Select onValueChange={(value) => updateOrderStatus(order.id, value)}>
-                                <SelectTrigger className="w-32">
-                                  <SelectValue placeholder="Update" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="pending">Pending</SelectItem>
-                                  <SelectItem value="shipped">Shipped</SelectItem>
-                                  <SelectItem value="delivered">Delivered</SelectItem>
-                                  <SelectItem value="cancelled">Cancelled</SelectItem>
-                                </SelectContent>
-                              </Select>
-                              <Button size="sm" variant="outline">
-                                <Eye className="w-4 h-4" />
-                              </Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            {/* Products Tab */}
-            <TabsContent value="products">
-              <Card className="bg-white bg-opacity-20 backdrop-blur-md border border-white border-opacity-30">
-                <CardHeader>
-                  <CardTitle className="flex items-center justify-between">
-                    <span>Product Management</span>
-                    <Dialog>
-                      <DialogTrigger asChild>
-                        <Button className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700">
-                          <Plus className="w-4 h-4 mr-2" />
-                          Add Product
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent className="max-w-4xl bg-white bg-opacity-95 backdrop-blur-md max-h-[90vh] overflow-y-auto">
-                        <DialogHeader>
-                          <DialogTitle>Add New Product</DialogTitle>
-                          <DialogDescription>Create a new product for your store</DialogDescription>
-                        </DialogHeader>
-                        <div className="space-y-6">
-                          {/* Basic Information */}
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                              <Label htmlFor="productName">Product Name *</Label>
-                              <Input id="productName" placeholder="Enter product name" />
-                            </div>
-                            <div className="space-y-2">
-                              <Label htmlFor="category">Category *</Label>
-                              <Select>
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Select category" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="dresses">Dresses</SelectItem>
-                                  <SelectItem value="accessories">Accessories</SelectItem>
-                                  <SelectItem value="beauty">Beauty</SelectItem>
-                                  <SelectItem value="shoes">Shoes</SelectItem>
-                                  <SelectItem value="bridal-wear">Bridal Wear</SelectItem>
-                                  <SelectItem value="bags">Bags</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            </div>
-                            <div className="space-y-2">
-                              <Label htmlFor="price">Price (PKR) *</Label>
-                              <Input id="price" type="number" placeholder="0" />
-                            </div>
-                            <div className="space-y-2">
-                              <Label htmlFor="originalPrice">Original Price (PKR)</Label>
-                              <Input id="originalPrice" type="number" placeholder="0" />
-                            </div>
-                            <div className="space-y-2">
-                              <Label htmlFor="stock">Stock Quantity *</Label>
-                              <Input id="stock" type="number" placeholder="0" />
-                            </div>
-                            <div className="space-y-2">
-                              <Label htmlFor="status">Status</Label>
-                              <Select defaultValue="active">
-                                <SelectTrigger>
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="active">Active</SelectItem>
-                                  <SelectItem value="inactive">Inactive</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            </div>
-                          </div>
-
-                          {/* Product Images */}
-                          <div className="space-y-4">
-                            <Label>Product Images</Label>
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                              {[1, 2, 3, 4].map((index) => (
-                                <div key={index} className="space-y-2">
-                                  <Label htmlFor={`image${index}`} className="text-sm">
-                                    Image {index}
-                                  </Label>
-                                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center hover:border-purple-400 transition-colors cursor-pointer">
-                                    <input
-                                      type="file"
-                                      id={`image${index}`}
-                                      accept="image/*"
-                                      className="hidden"
-                                      onChange={(e) => {
-                                        const file = e.target.files?.[0]
-                                        if (file) {
-                                          console.log(`Image ${index} selected:`, file.name)
-                                        }
-                                      }}
-                                    />
-                                    <label htmlFor={`image${index}`} className="cursor-pointer">
-                                      <div className="w-full h-24 bg-gray-100 rounded flex items-center justify-center">
-                                        <span className="text-gray-500 text-sm">Click to upload</span>
+          <Tabs defaultValue="products">
+              <TabsList>
+                  <TabsTrigger value="products">Products</TabsTrigger>
+                  <TabsTrigger value="categories">Categories</TabsTrigger>
+              </TabsList>
+              <TabsContent value="products">
+                  <Card>
+                      <CardHeader>
+                          <CardTitle className="flex justify-between items-center">
+                              Product Management
+                              <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+                                  <DialogTrigger asChild>
+                                      <Button>Add Product</Button>
+                                  </DialogTrigger>
+                                  <DialogContent className="max-h-[90vh] overflow-y-auto">
+                                      <DialogHeader>
+                                          <DialogTitle>Add New Product</DialogTitle>
+                                          <DialogDescription>Fill in the details for the new product.</DialogDescription>
+                                      </DialogHeader>
+                                      <div className="space-y-4 py-4">
+                                          <div><Label>Name</Label><Input value={newProduct.name} onChange={e => handleInputChange('name', e.target.value)} /></div>
+                                          <div><Label>Category</Label>
+                                            <Select onValueChange={value => handleInputChange('category', value)}>
+                                                <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
+                                                <SelectContent>
+                                                    {categories.map(cat => <SelectItem key={cat.id} value={cat.name}>{cat.name}</SelectItem>)}
+                                                </SelectContent>
+                                            </Select>
+                                          </div>
+                                          <div><Label>Price</Label><Input type="number" value={String(newProduct.price)} onChange={e => handleInputChange('price', e.target.value)} /></div>
+                                          <div><Label>Original Price (Optional)</Label><Input type="number" value={String(newProduct.originalPrice || '')} onChange={e => handleInputChange('originalPrice', e.target.value)} /></div>
+                                          <div><Label>Stock</Label><Input type="number" value={String(newProduct.stock)} onChange={e => handleInputChange('stock', e.target.value)} /></div>
+                                          <div><Label>Description</Label><Textarea value={newProduct.description} onChange={e => handleInputChange('description', e.target.value)} /></div>
+                                          {/* Image Upload can be added here */}
                                       </div>
-                                    </label>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                            <p className="text-sm text-gray-600">
-                              Upload up to 4 product images. First image will be the main image.
-                            </p>
+                                      <Button onClick={handleAddProduct}>Publish Product</Button>
+                                  </DialogContent>
+                              </Dialog>
+                          </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                          {isLoading ? <Loader2 className="animate-spin" /> :
+                          <Table>
+                              <TableHeader><TableRow><TableHead>Image</TableHead><TableHead>Product</TableHead><TableHead>Price</TableHead><TableHead>Stock</TableHead><TableHead>Actions</TableHead></TableRow></TableHeader>
+                              <TableBody>
+                                  {products.map(p => (
+                                      <TableRow key={p.id}>
+                                          <TableCell><img src={p.imageUrl} alt={p.name} className="w-12 h-12" /></TableCell>
+                                          <TableCell>{p.name}</TableCell>
+                                          <TableCell>{formatPrice(p.price)}</TableCell>
+                                          <TableCell>{p.stock}</TableCell>
+                                          <TableCell><Button variant="destructive" size="sm" onClick={() => handleDeleteProduct(p.id)}><Trash2 className="w-4 h-4" /></Button></TableCell>
+                                      </TableRow>
+                                  ))}
+                              </TableBody>
+                          </Table>}
+                      </CardContent>
+                  </Card>
+              </TabsContent>
+              <TabsContent value="categories">
+                  <Card>
+                      <CardHeader><CardTitle>Category Management</CardTitle></CardHeader>
+                      <CardContent className="space-y-4">
+                          <div className="flex gap-2">
+                              <Input placeholder="New category name" value={newCategoryName} onChange={e => setNewCategoryName(e.target.value)} />
+                              <Button onClick={handleAddCategory}>Add Category</Button>
                           </div>
-
-                          {/* Product Variants */}
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                              <Label htmlFor="sizes">Available Sizes</Label>
-                              <Input id="sizes" placeholder="XS, S, M, L, XL" />
-                              <p className="text-xs text-gray-500">Separate sizes with commas</p>
-                            </div>
-                            <div className="space-y-2">
-                              <Label htmlFor="colors">Available Colors</Label>
-                              <Input id="colors" placeholder="Black, White, Red, Blue" />
-                              <p className="text-xs text-gray-500">Separate colors with commas</p>
-                            </div>
-                          </div>
-
-                          {/* Product Details */}
-                          <div className="space-y-4">
-                            <div className="space-y-2">
-                              <Label htmlFor="description">Product Description *</Label>
-                              <Textarea
-                                id="description"
-                                className="resize-none h-24"
-                                placeholder="Detailed product description..."
-                              />
-                            </div>
-                            <div className="space-y-2">
-                              <Label htmlFor="features">Key Features</Label>
-                              <Textarea
-                                id="features"
-                                className="resize-none h-20"
-                                placeholder="Premium quality, Elegant design, Perfect fit (one per line)"
-                              />
-                            </div>
-                          </div>
-
-                          {/* Product Specifications */}
-                          <div className="space-y-4">
-                            <Label>Product Specifications</Label>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                              <div className="space-y-2">
-                                <Label htmlFor="material">Material</Label>
-                                <Input id="material" placeholder="e.g., Cotton, Silk, Polyester" />
-                              </div>
-                              <div className="space-y-2">
-                                <Label htmlFor="care">Care Instructions</Label>
-                                <Input id="care" placeholder="e.g., Machine wash, Dry clean only" />
-                              </div>
-                              <div className="space-y-2">
-                                <Label htmlFor="origin">Origin</Label>
-                                <Input id="origin" placeholder="e.g., Made in Pakistan" />
-                              </div>
-                              <div className="space-y-2">
-                                <Label htmlFor="fit">Fit Type</Label>
-                                <Input id="fit" placeholder="e.g., Regular fit, Slim fit" />
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* SEO & Marketing */}
-                          <div className="space-y-4">
-                            <div className="flex items-center space-x-2">
-                              <input type="checkbox" id="isNew" className="rounded" />
-                              <Label htmlFor="isNew">Mark as New Product</Label>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                              <input type="checkbox" id="isFeatured" className="rounded" />
-                              <Label htmlFor="isFeatured">Feature on Homepage</Label>
-                            </div>
-                          </div>
-
-                          {/* Action Buttons */}
-                          <div className="flex justify-end gap-3 pt-4 border-t">
-                            <Button variant="outline" onClick={() => {}}>
-                              Save as Draft
-                            </Button>
-                            <Button className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700">
-                              Publish Product
-                            </Button>
-                          </div>
-                        </div>
-                      </DialogContent>
-                    </Dialog>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Image</TableHead>
-                        <TableHead>Product</TableHead>
-                        <TableHead>Category</TableHead>
-                        <TableHead>Price</TableHead>
-                        <TableHead>Stock</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {products.map((product) => (
-                        <TableRow key={product.id}>
-                          <TableCell>
-                            <img
-                              src={product.image || "/placeholder.svg"}
-                              alt={product.name}
-                              className="w-12 h-12 object-cover rounded-lg"
-                            />
-                          </TableCell>
-                          <TableCell className="font-medium">{product.name}</TableCell>
-                          <TableCell>{product.category}</TableCell>
-                          <TableCell>{formatPrice(product.price)}</TableCell>
-                          <TableCell>
-                            <span className={product.stock === 0 ? "text-red-500" : "text-green-500"}>
-                              {product.stock}
-                            </span>
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant={product.status === "active" ? "default" : "secondary"}>
-                              {product.status}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex gap-2">
-                              <Button size="sm" variant="outline">
-                                <Edit className="w-4 h-4" />
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="text-red-500 hover:bg-red-500 hover:text-white bg-transparent"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            {/* Users Tab */}
-            <TabsContent value="users">
-              <Card className="bg-white bg-opacity-20 backdrop-blur-md border border-white border-opacity-30">
-                <CardHeader>
-                  <CardTitle>User Accounts</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Name</TableHead>
-                        <TableHead>Email</TableHead>
-                        <TableHead>Phone</TableHead>
-                        <TableHead>Orders</TableHead>
-                        <TableHead>Total Spent</TableHead>
-                        <TableHead>Join Date</TableHead>
-                        <TableHead>Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {users.map((user) => (
-                        <TableRow key={user.id}>
-                          <TableCell className="font-medium">{user.name}</TableCell>
-                          <TableCell>{user.email}</TableCell>
-                          <TableCell>{user.phone}</TableCell>
-                          <TableCell>{user.orders}</TableCell>
-                          <TableCell>{formatPrice(user.totalSpent)}</TableCell>
-                          <TableCell>{user.joinDate}</TableCell>
-                          <TableCell>
-                            <Button size="sm" variant="outline">
-                              <Eye className="w-4 h-4" />
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            {/* Categories Tab */}
-            <TabsContent value="categories">
-              <Card className="bg-white bg-opacity-20 backdrop-blur-md border border-white border-opacity-30">
-                <CardHeader>
-                  <CardTitle className="flex items-center justify-between">
-                    <span>Category Management</span>
-                    <Button className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700">
-                      <Plus className="w-4 h-4 mr-2" />
-                      Add Category
-                    </Button>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {["Dresses", "Accessories", "Beauty", "Shoes", "Bridal Wear", "Bags"].map((category) => (
-                      <Card
-                        key={category}
-                        className="bg-white bg-opacity-10 backdrop-blur-sm border border-white border-opacity-20"
-                      >
-                        <CardContent className="p-4">
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <h3 className="font-semibold">{category}</h3>
-                              <p className="text-sm text-gray-600">12 products</p>
-                            </div>
-                            <div className="flex gap-2">
-                              <Button size="sm" variant="outline">
-                                <Edit className="w-4 h-4" />
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="text-red-500 hover:bg-red-500 hover:text-white bg-transparent"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </Button>
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
+                           {isLoading ? <Loader2 className="animate-spin" /> :
+                          <Table>
+                              <TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Actions</TableHead></TableRow></TableHeader>
+                              <TableBody>
+                                  {categories.map(c => (
+                                      <TableRow key={c.id}>
+                                          <TableCell>{c.name}</TableCell>
+                                          <TableCell><Button variant="destructive" size="sm" onClick={() => handleDeleteCategory(c.id)}><Trash2 className="w-4 h-4" /></Button></TableCell>
+                                      </TableRow>
+                                  ))}
+                              </TableBody>
+                          </Table>}
+                      </CardContent>
+                  </Card>
+              </TabsContent>
           </Tabs>
         </div>
       </div>
