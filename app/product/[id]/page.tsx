@@ -36,7 +36,12 @@ function ProductDetailsContent() {
         if (!supabase || !productId) return;
         setIsLoading(true);
         const { data, error } = await supabase.from('products').select('*').eq('id', productId).single();
-        if (data) setProduct(data);
+        if (data) {
+            setProduct(data);
+            // Set default selected size and color if available
+            if (data.sizes?.length > 0) setSelectedSize(data.sizes[0]);
+            if (data.colors?.length > 0) setSelectedColor(data.colors[0]);
+        }
         setIsLoading(false);
     }
     fetchProduct();

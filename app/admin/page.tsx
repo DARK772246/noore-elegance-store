@@ -1,5 +1,4 @@
 "use client"
-
 import type React from "react"
 import { useState, useEffect, ChangeEvent } from "react"
 import { Button } from "@/components/ui/button"
@@ -18,28 +17,15 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Package, Plus, Trash2, Lock, Loader2, Upload, ShoppingCart } from "lucide-react"
+import { Package, Plus, Trash2, Lock, Loader2, Upload, ShoppingCart, Badge } from "lucide-react"
 import { createClient, User } from '@supabase/supabase-js'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-if (!supabaseUrl || !supabaseKey) {
-  console.error("Supabase URL or Key is missing. Check Environment Variables in Vercel.");
-}
+if (!supabaseUrl || !supabaseKey) { console.error("Supabase keys are missing!"); }
 const supabase = (supabaseUrl && supabaseKey) ? createClient(supabaseUrl, supabaseKey) : null;
 
-interface Product {
-    id?: number;
-    name: string;
-    description: string;
-    price: number | string;
-    category: string;
-    sizes: string[];
-    colors: string[];
-    stock: number | string;
-    imageUrls: string[];
-}
+interface Product { id?: number; name: string; category: string; price: number | string; stock: number | string; description: string; imageUrls: string[]; sizes: string[]; colors: string[]; }
 interface Category { id: number; name: string; }
 interface Order { id: number; customer_details: any; order_items: any[]; total_price: number; status: string; created_at: string; }
 
@@ -47,14 +33,12 @@ export default function AdminPanel() {
   const [user, setUser] = useState<User | null>(null);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
-  
   const [newProduct, setNewProduct] = useState<any>({ name: "", category: "", price: "", stock: "", description: "", sizes: "", colors: "" });
   const [newCategoryName, setNewCategoryName] = useState("");
   const [files, setFiles] = useState<File[]>([]);
@@ -116,12 +100,10 @@ export default function AdminPanel() {
     setIsLoading(false);
   };
   
-  const handleInputChange = (field: keyof Product, value: string) => { setNewProduct(prev => ({ ...prev, [field]: value })); };
-      
+  const handleInputChange = (field: any, value: string) => { setNewProduct(prev => ({ ...prev, [field]: value })); };
+  
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
-      if (event.target.files && event.target.files.length > 0) {
-          setFiles(Array.from(event.target.files).slice(0, 4)); // Limit to 4 files
-      }
+      if (event.target.files) { setFiles(Array.from(event.target.files).slice(0, 4)); }
   };
 
   const handleAddProduct = async () => {
@@ -130,6 +112,12 @@ export default function AdminPanel() {
       setIsUploading(true);
       const imageUrls: string[] = [];
       
+      if (files.length === 0) {
+        alert("Please select at least one image.");
+        setIsUploading(false);
+        return;
+      }
+
       for (const file of files) {
           const fileName = `${Date.now()}_${file.name.replace(/\s/g, '_')}`;
           const { error: uploadError } = await supabase.storage.from('product-images').upload(fileName, file);
@@ -148,7 +136,7 @@ export default function AdminPanel() {
           stock: Number(newProduct.stock),
           sizes: newProduct.sizes.split(',').map((s: string) => s.trim()).filter(Boolean),
           colors: newProduct.colors.split(',').map((c: string) => c.trim()).filter(Boolean),
-          imageUrls: imageUrls.length > 0 ? imageUrls : ["/placeholder.svg"],
+          imageUrls: imageUrls,
       };
       
       const { error } = await supabase.from('products').insert([productToInsert]);
@@ -225,6 +213,7 @@ export default function AdminPanel() {
               <TabsContent value="orders">
                   <Card><CardHeader><CardTitle>Order Management</CardTitle></CardHeader>
                       <CardContent>
+                        {isLoading ? <div className="flex justify-center p-8"><Loader2 className="animate-spin" /></div> :
                           <div className="overflow-x-auto">
                               <Table>
                                   <TableHeader><TableRow><TableHead>Customer</TableHead><TableHead>Items</TableHead><TableHead>Total</TableHead><TableHead>Status</TableHead><TableHead>Actions</TableHead></TableRow></TableHeader>
@@ -249,7 +238,7 @@ export default function AdminPanel() {
                                       ))}
                                   </TableBody>
                               </Table>
-                          </div>
+                          </div>}
                       </CardContent>
                   </Card>
               </TabsContent>
