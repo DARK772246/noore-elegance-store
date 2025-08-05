@@ -47,7 +47,8 @@ function HomePageContent() {
       setShowAuthModal(true);
       return;
     }
-    addToCart(product);
+    // NOTE: This adds to cart without size/color, user must go to product page for variants
+    addToCart(product, 1, 'Default', 'Default');
     alert("Product added to cart!");
   };
   const formatPrice = (price: number) => `₨ ${price.toLocaleString()}`;
@@ -90,22 +91,21 @@ function HomePageContent() {
           {isLoading ? <div className="flex justify-center"><Loader2 className="w-8 h-8 animate-spin"/></div> :
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
             {products.map((product) => (
-              <Card key={product.id} className="group cursor-pointer">
-                <div className="relative overflow-hidden">
-                  <img src={product.imageUrl || "/placeholder.svg"} alt={product.name} className="w-full h-80 object-cover"/>
-                  <div className="absolute bottom-4 left-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <Button onClick={() => handleAddToCart(product)} className="w-full"><ShoppingBag className="w-4 h-4 mr-2" />Add to Cart</Button>
+              <Link key={product.id} href={`/product/${product.id}`} passHref>
+                <Card className="group cursor-pointer h-full flex flex-col">
+                  <div className="relative overflow-hidden">
+                    {/* THE FIX IS HERE: Use the first image from the array */}
+                    <img src={product.imageUrls && product.imageUrls.length > 0 ? product.imageUrls[0] : "/placeholder.svg"} alt={product.name} className="w-full h-80 object-cover group-hover:scale-105 transition-transform"/>
                   </div>
-                </div>
-                <CardContent className="p-4">
-                  <h3 className="font-semibold truncate">{product.name}</h3>
-                  <p className="text-sm text-gray-500">{product.category}</p>
-                  <div className="flex items-center gap-2 mt-2">
-                    <span className="font-bold">{formatPrice(product.price)}</span>
-                    {product.originalPrice && <span className="text-sm line-through text-gray-400">{formatPrice(product.originalPrice)}</span>}
-                  </div>
-                </CardContent>
-              </Card>
+                  <CardContent className="p-4 flex flex-col flex-grow">
+                    <h3 className="font-semibold truncate flex-grow">{product.name}</h3>
+                    <p className="text-sm text-gray-500">{product.category}</p>
+                    <div className="flex items-center gap-2 mt-2">
+                      <span className="font-bold text-purple-600">{formatPrice(product.price)}</span>
+                    </div>
+                  </CardContent>
+                </Card>
+              </Link>
             ))}
           </div>}
         </div>
