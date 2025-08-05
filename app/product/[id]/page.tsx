@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
+import { Label } from "@/components/ui/label"
 import { Loader2, ShoppingBag, ArrowLeft } from "lucide-react"
 import { Navigation } from "@/components/navigation"
 import { Footer } from "@/components/footer"
@@ -44,10 +44,10 @@ function ProductDetailsContent() {
 
   const handleAddToCart = () => {
     if (!isLoggedIn) { setShowAuthModal(true); return; }
-    if (product.sizes.length > 0 && !selectedSize) { alert("Please select a size"); return; }
-    if (product.colors.length > 0 && !selectedColor) { alert("Please select a color"); return; }
+    if (product.sizes?.length > 0 && !selectedSize) { alert("Please select a size"); return; }
+    if (product.colors?.length > 0 && !selectedColor) { alert("Please select a color"); return; }
     
-    addToCart({ ...product, quantity, selectedSize, selectedColor });
+    addToCart(product, quantity, selectedSize, selectedColor);
     alert(`${quantity} item(s) added to cart!`);
   };
 
@@ -57,7 +57,7 @@ function ProductDetailsContent() {
       return <div className="flex h-screen items-center justify-center"><Loader2 className="w-12 h-12 animate-spin"/></div>
   }
   if (!product) {
-      return <div>Product not found</div>
+      return <div className="flex h-screen items-center justify-center">Product not found.</div>
   }
 
   return (
@@ -72,13 +72,15 @@ function ProductDetailsContent() {
               <div className="relative overflow-hidden rounded-lg shadow-lg">
                 <img src={product.imageUrls[selectedImage]} alt={product.name} className="w-full h-96 lg:h-[600px] object-cover" />
               </div>
-              <div className="grid grid-cols-4 gap-2 mt-4">
-                {product.imageUrls.map((image: string, index: number) => (
-                  <button key={index} onClick={() => setSelectedImage(index)} className={`rounded-lg border-2 ${selectedImage === index ? 'border-purple-500' : 'border-transparent'}`}>
-                    <img src={image} alt={`${product.name} ${index + 1}`} className="w-full h-20 object-cover rounded-md" />
-                  </button>
-                ))}
-              </div>
+              {product.imageUrls.length > 1 && (
+                <div className="grid grid-cols-4 gap-2 mt-4">
+                  {product.imageUrls.map((image: string, index: number) => (
+                    <button key={index} onClick={() => setSelectedImage(index)} className={`rounded-lg border-2 ${selectedImage === index ? 'border-purple-500' : 'border-transparent'}`}>
+                      <img src={image} alt={`${product.name} ${index + 1}`} className="w-full h-20 object-cover rounded-md" />
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
             <div className="space-y-6">
               <h1 className="text-3xl lg:text-4xl font-bold">{product.name}</h1>
@@ -102,5 +104,12 @@ function ProductDetailsContent() {
 }
 
 export default function ProductPage() {
-  return ( <AuthProvider><CartProvider><ProductDetailsContent /><CartSidebar /></CartProvider></AuthProvider> )
+  return (
+    <AuthProvider>
+        <CartProvider>
+            <ProductDetailsContent />
+            <CartSidebar />
+        </CartProvider>
+    </AuthProvider>
+  )
 }
